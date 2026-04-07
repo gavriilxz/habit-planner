@@ -284,3 +284,18 @@ input { font-family: var(--font); }
   transition: background 0.2s;
 }
 .signout-full:active { background: rgba(255,82,82,0.2); }
+
+/* ── Auth tabs ── */
+.auth-tabs {
+  display: flex; width: 100%;
+  background: var(--surface2); border-radius: var(--radius-sm);
+  padding: 4px; gap: 4px;
+}
+.auth-tab {
+  flex: 1; padding: 10px; border-radius: 8px;
+  font-size: 14px; font-weight: 500; color: var(--text-muted);
+  transition: all 0.2s;
+}
+.auth-tab.active {
+  background: var(--surface); color: var(--text);
+}

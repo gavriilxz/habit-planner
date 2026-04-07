@@ -7,6 +7,7 @@ let checkins = {}
 let currentView = 'today'
 let currentMonth = new Date().getMonth()
 let loading = true
+let authMode = 'login' // 'login' | 'register'
 
 const today = new Date()
 const todayStr = fmtDate(today)
@@ -21,26 +22,13 @@ const MONTH_DAYS = [31,28,29,31,30,31,30,31,31,30,31,30,31]
 // ── Auth ──────────────────────────────────────────────────────
 async function init() {
   render()
-
-  // Trata redirect do magic link (funciona no Safari)
-  const { data: { session: sessionFromUrl } } = await supabase.auth.getSessionFromUrl({ storeSession: true }).catch(() => ({ data: { session: null } }))
-
   const { data: { session } } = await supabase.auth.getSession()
-  currentUser = sessionFromUrl?.user ?? session?.user ?? null
-
-  // Limpa o hash da URL sem recarregar
-  if (window.location.hash.includes('access_token')) {
-    history.replaceState(null, '', window.location.pathname)
-  }
+  currentUser = session?.user ?? null
 
   supabase.auth.onAuthStateChange((_event, session) => {
-    const wasLoggedIn = !!currentUser
     currentUser = session?.user ?? null
-    if (currentUser) {
-      loadAll()
-    } else if (wasLoggedIn) {
-      habits = []; checkins = {}; loading = false; render()
-    }
+    if (currentUser) loadAll()
+    else { habits = []; checkins = {}; loading = false; render() }
   })
 
   if (currentUser) await loadAll()
@@ -49,11 +37,13 @@ async function init() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{})
 }
 
-async function sendMagicLink(email) {
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: 'https://habit-planner-dusky.vercel.app' }
-  })
+async function signUp(email, password) {
+  const { error } = await supabase.auth.signUp({ email, password })
+  return error
+}
+
+async function signIn(email, password) {
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
   return error
 }
 
@@ -114,8 +104,8 @@ function render() {
   }
 
   if (!currentUser) {
-    app.innerHTML = renderLogin()
-    attachLoginEvents()
+    app.innerHTML = renderAuth()
+    attachAuthEvents()
     return
   }
 
@@ -161,49 +151,77 @@ function fmtDateLabel(d) {
   return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`
 }
 
-function renderLogin() {
+// ── Auth Screen ───────────────────────────────────────────────
+function renderAuth() {
+  const isLogin = authMode === 'login'
   return `
     <div class="login-wrap">
       <div class="login-card">
         <div class="login-logo">✦</div>
         <h1 class="login-title">Planner de Hábitos</h1>
-        <p class="login-sub">Digite seu e-mail para entrar. Vamos te mandar um link mágico — sem senha!</p>
-        <div class="login-form" id="login-form">
-          <input type="email" id="login-email" placeholder="seu@email.com" />
-          <button class="login-btn" id="login-submit">Entrar</button>
+        <div class="auth-tabs">
+          <button class="auth-tab ${isLogin?'active':''}" data-mode="login">Entrar</button>
+          <button class="auth-tab ${!isLogin?'active':''}" data-mode="register">Criar conta</button>
         </div>
-        <div id="login-msg" class="login-msg"></div>
+        <div class="login-form">
+          <input type="email" id="auth-email" placeholder="seu@email.com" autocomplete="email" />
+          <input type="password" id="auth-password" placeholder="Senha (mín. 6 caracteres)" autocomplete="${isLogin?'current-password':'new-password'}" />
+          <button class="login-btn" id="auth-submit">${isLogin?'Entrar':'Criar conta'}</button>
+        </div>
+        <div id="auth-msg" class="login-msg"></div>
       </div>
     </div>`
 }
 
-function attachLoginEvents() {
-  const btn = document.getElementById('login-submit')
-  const input = document.getElementById('login-email')
-  const msg = document.getElementById('login-msg')
+function attachAuthEvents() {
+  document.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      authMode = tab.dataset.mode
+      render()
+    })
+  })
 
-  async function doLogin() {
-    const email = input.value.trim()
-    if (!email) return
-    btn.textContent = 'Enviando...'
+  const btn = document.getElementById('auth-submit')
+  const emailInput = document.getElementById('auth-email')
+  const passInput = document.getElementById('auth-password')
+  const msg = document.getElementById('auth-msg')
+
+  async function doAuth() {
+    const email = emailInput.value.trim()
+    const password = passInput.value
+    if (!email || !password) { msg.textContent = 'Preencha e-mail e senha.'; msg.className = 'login-msg error'; return }
+    if (password.length < 6) { msg.textContent = 'Senha precisa ter pelo menos 6 caracteres.'; msg.className = 'login-msg error'; return }
+
     btn.disabled = true
-    const error = await sendMagicLink(email)
+    btn.textContent = authMode === 'login' ? 'Entrando...' : 'Criando conta...'
+
+    const error = authMode === 'login'
+      ? await signIn(email, password)
+      : await signUp(email, password)
+
     if (error) {
-      msg.textContent = 'Erro ao enviar. Tente novamente.'
+      const errMap = {
+        'Invalid login credentials': 'E-mail ou senha incorretos.',
+        'User already registered': 'Este e-mail já está cadastrado. Tente entrar.',
+        'Email not confirmed': 'Confirme seu e-mail antes de entrar.',
+      }
+      msg.textContent = errMap[error.message] || 'Erro: ' + error.message
       msg.className = 'login-msg error'
-      btn.textContent = 'Entrar'
       btn.disabled = false
-    } else {
-      msg.innerHTML = `✅ Link enviado para <strong>${email}</strong>!<br>Abra o e-mail e clique no link — ele vai te trazer direto pro app.`
+      btn.textContent = authMode === 'login' ? 'Entrar' : 'Criar conta'
+    } else if (authMode === 'register') {
+      msg.innerHTML = '✅ Conta criada! Agora clique em <strong>Entrar</strong> com seu e-mail e senha.'
       msg.className = 'login-msg success'
-      document.getElementById('login-form').style.display = 'none'
+      authMode = 'login'
+      setTimeout(() => render(), 2000)
     }
   }
 
-  btn.addEventListener('click', doLogin)
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin() })
+  btn.addEventListener('click', doAuth)
+  passInput.addEventListener('keydown', e => { if (e.key === 'Enter') doAuth() })
 }
 
+// ── Habit rows ────────────────────────────────────────────────
 function habitIcon(name) {
   const n = name.toLowerCase()
   if (n.includes('bíblia')||n.includes('biblia')) return '📖'
