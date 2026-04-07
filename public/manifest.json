@@ -1,10 +1,10 @@
 {
-  "name": "Planner de Hábitos",
-  "short_name": "Hábitos",
+  "name": "Fiel — Planner de Hábitos",
+  "short_name": "Fiel",
   "description": "Seu planner de hábitos diários",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f0f0f",
+  "background_color": "#0a0a0a",
   "theme_color": "#E91E8C",
   "orientation": "portrait",
   "icons": [

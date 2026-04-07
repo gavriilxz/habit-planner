@@ -6,25 +6,15 @@
   <meta name="theme-color" content="#E91E8C" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Hábitos" />
+  <meta name="apple-mobile-web-app-title" content="Fiel" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
-  <title>Planner de Hábitos 2026</title>
+  <title>Fiel — Planner de Hábitos</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
 </head>
 <body>
   <div id="app"></div>
-  <!-- Intercepta o hash do magic link ANTES do JS carregar -->
-  <script>
-    // O Supabase manda o token no hash (#access_token=...) ou como query (?code=...)
-    // Detecta e salva no sessionStorage pra o app processar
-    const hash = window.location.hash
-    const search = window.location.search
-    if (hash.includes('access_token') || search.includes('code=')) {
-      sessionStorage.setItem('auth_redirect', window.location.href)
-    }
-  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

@@ -7,7 +7,7 @@ let checkins = {}
 let currentView = 'today'
 let currentMonth = new Date().getMonth()
 let loading = true
-let authMode = 'login' // 'login' | 'register'
+let authMode = 'login'
 
 const today = new Date()
 const todayStr = fmtDate(today)
@@ -18,6 +18,7 @@ function fmtDate(d) {
 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 const MONTH_DAYS = [31,28,29,31,30,31,30,31,31,30,31,30,31]
+const WEEK_DAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 
 // ── Auth ──────────────────────────────────────────────────────
 async function init() {
@@ -41,12 +42,10 @@ async function signUp(email, password) {
   const { error } = await supabase.auth.signUp({ email, password })
   return error
 }
-
 async function signIn(email, password) {
   const { error } = await supabase.auth.signInWithPassword({ email, password })
   return error
 }
-
 async function signOut() {
   await supabase.auth.signOut()
   habits = []; checkins = {}; currentView = 'today'; render()
@@ -94,6 +93,23 @@ async function deleteHabit(id) {
   await supabase.from('habits').delete().eq('id', id)
 }
 
+// ── Streak ────────────────────────────────────────────────────
+function calcStreak() {
+  let streak = 0
+  const d = new Date(today)
+  while (true) {
+    const dateStr = fmtDate(d)
+    const allDone = habits.length > 0 && habits.every(h => {
+      const v = getCheckin(h.id, dateStr)
+      return h.is_water ? v >= 6 : v >= 1
+    })
+    if (!allDone) break
+    streak++
+    d.setDate(d.getDate() - 1)
+  }
+  return streak
+}
+
 // ── Render ────────────────────────────────────────────────────
 function render() {
   const app = document.getElementById('app')
@@ -114,7 +130,7 @@ function render() {
       <header class="topbar">
         <div class="topbar-left">
           <span class="logo">✦</span>
-          <span class="app-title">Hábitos</span>
+          <span class="app-title">Fiel</span>
         </div>
         <div class="topbar-right">
           <span class="topbar-date">${fmtDateLabel(today)}</span>
@@ -151,14 +167,15 @@ function fmtDateLabel(d) {
   return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`
 }
 
-// ── Auth Screen ───────────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────
 function renderAuth() {
   const isLogin = authMode === 'login'
   return `
     <div class="login-wrap">
       <div class="login-card">
         <div class="login-logo">✦</div>
-        <h1 class="login-title">Planner de Hábitos</h1>
+        <h1 class="login-title">Fiel</h1>
+        <p class="login-sub">Seu planner de hábitos diários</p>
         <div class="auth-tabs">
           <button class="auth-tab ${isLogin?'active':''}" data-mode="login">Entrar</button>
           <button class="auth-tab ${!isLogin?'active':''}" data-mode="register">Criar conta</button>
@@ -175,10 +192,7 @@ function renderAuth() {
 
 function attachAuthEvents() {
   document.querySelectorAll('.auth-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      authMode = tab.dataset.mode
-      render()
-    })
+    tab.addEventListener('click', () => { authMode = tab.dataset.mode; render() })
   })
 
   const btn = document.getElementById('auth-submit')
@@ -191,29 +205,23 @@ function attachAuthEvents() {
     const password = passInput.value
     if (!email || !password) { msg.textContent = 'Preencha e-mail e senha.'; msg.className = 'login-msg error'; return }
     if (password.length < 6) { msg.textContent = 'Senha precisa ter pelo menos 6 caracteres.'; msg.className = 'login-msg error'; return }
-
     btn.disabled = true
     btn.textContent = authMode === 'login' ? 'Entrando...' : 'Criando conta...'
-
-    const error = authMode === 'login'
-      ? await signIn(email, password)
-      : await signUp(email, password)
-
+    const error = authMode === 'login' ? await signIn(email, password) : await signUp(email, password)
     if (error) {
       const errMap = {
         'Invalid login credentials': 'E-mail ou senha incorretos.',
         'User already registered': 'Este e-mail já está cadastrado. Tente entrar.',
-        'Email not confirmed': 'Confirme seu e-mail antes de entrar.',
       }
       msg.textContent = errMap[error.message] || 'Erro: ' + error.message
       msg.className = 'login-msg error'
       btn.disabled = false
       btn.textContent = authMode === 'login' ? 'Entrar' : 'Criar conta'
     } else if (authMode === 'register') {
-      msg.innerHTML = '✅ Conta criada! Agora clique em <strong>Entrar</strong> com seu e-mail e senha.'
+      msg.innerHTML = '✅ Conta criada! Clique em <strong>Entrar</strong>.'
       msg.className = 'login-msg success'
       authMode = 'login'
-      setTimeout(() => render(), 2000)
+      setTimeout(() => render(), 1500)
     }
   }
 
@@ -221,7 +229,7 @@ function attachAuthEvents() {
   passInput.addEventListener('keydown', e => { if (e.key === 'Enter') doAuth() })
 }
 
-// ── Habit rows ────────────────────────────────────────────────
+// ── Today ─────────────────────────────────────────────────────
 function habitIcon(name) {
   const n = name.toLowerCase()
   if (n.includes('bíblia')||n.includes('biblia')) return '📖'
@@ -284,16 +292,24 @@ function renderToday() {
     return h.is_water ? v >= 6 : v >= 1
   }).length
   const pct = Math.round((done/habits.length)*100)
+  const streak = calcStreak()
 
   return `
     <div class="today-wrap">
-      <div class="progress-card">
-        <div class="progress-header">
-          <span class="progress-label">Progresso de hoje</span>
-          <span class="progress-pct">${pct}%</span>
+      <div class="stats-row">
+        <div class="progress-card">
+          <div class="progress-header">
+            <span class="progress-label">Hoje</span>
+            <span class="progress-pct">${pct}%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <div class="progress-sub">${done} de ${habits.length} completos</div>
         </div>
-        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-        <div class="progress-sub">${done} de ${habits.length} hábitos completos</div>
+        <div class="streak-card">
+          <div class="streak-fire">${streak > 0 ? '🔥' : '💤'}</div>
+          <div class="streak-num">${streak}</div>
+          <div class="streak-label">${streak === 1 ? 'dia' : 'dias'}</div>
+        </div>
       </div>
       <div class="habits-list">
         ${habits.map(h => renderHabitRow(h, todayStr)).join('')}
@@ -301,9 +317,20 @@ function renderToday() {
     </div>`
 }
 
+// ── Month (calendário em grade) ───────────────────────────────
 function renderMonth() {
   const year = 2026
   const daysInMonth = MONTH_DAYS[currentMonth]
+
+  // Dia da semana do dia 1 do mês
+  const firstDayOfWeek = new Date(year, currentMonth, 1).getDay()
+
+  // Gera os dias do calendário em grade
+  const calDays = []
+  for (let i = 0; i < firstDayOfWeek; i++) calDays.push(null)
+  for (let d = 1; d <= daysInMonth; d++) calDays.push(d)
+  while (calDays.length % 7 !== 0) calDays.push(null)
+
   return `
     <div class="month-wrap">
       <div class="month-nav">
@@ -311,34 +338,47 @@ function renderMonth() {
         <span class="month-title">${MONTHS[currentMonth]} ${year}</span>
         <button class="month-arrow" id="next-month">›</button>
       </div>
-      <div class="month-grid-wrap">
-        <table class="month-table">
-          <thead><tr>
-            <th class="habit-col">Hábito</th>
-            ${Array.from({length:daysInMonth},(_,i)=>`<th class="day-col">${i+1}</th>`).join('')}
-          </tr></thead>
-          <tbody>
-            ${habits.map(h => `
-              <tr>
-                <td class="habit-name-cell"><span>${habitIcon(h.name)}</span><span>${h.name}</span></td>
-                ${Array.from({length:daysInMonth},(_,i) => {
-                  const d = `${year}-${String(currentMonth+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`
-                  const val = getCheckin(h.id, d)
-                  const done = h.is_water ? val>=6 : val>=1
-                  const isToday = d === todayStr
-                  if (h.is_water) {
-                    const color = val===0?'':(val>=6?'cell-green':'cell-yellow')
-                    return `<td class="day-cell ${color} ${isToday?'today-cell':''}">${val>0?val:''}</td>`
-                  }
-                  return `<td class="day-cell ${done?'cell-green':''} ${isToday?'today-cell':''}">${done?'✓':''}</td>`
-                }).join('')}
-              </tr>`).join('')}
-          </tbody>
-        </table>
+
+      <div class="cal-grid">
+        ${WEEK_DAYS.map(d => `<div class="cal-weekday">${d}</div>`).join('')}
+        ${calDays.map(day => {
+          if (!day) return `<div class="cal-day empty"></div>`
+          const dateStr = `${year}-${String(currentMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+          const isToday = dateStr === todayStr
+          const totalHabits = habits.length
+          const doneCount = habits.filter(h => {
+            const v = getCheckin(h.id, dateStr)
+            return h.is_water ? v >= 6 : v >= 1
+          }).length
+          const allDone = totalHabits > 0 && doneCount === totalHabits
+          const someDone = doneCount > 0 && !allDone
+          const future = dateStr > todayStr
+
+          let cls = 'cal-day'
+          if (isToday) cls += ' cal-today'
+          if (allDone) cls += ' cal-done'
+          else if (someDone) cls += ' cal-partial'
+          else if (future) cls += ' cal-future'
+
+          return `
+            <div class="${cls}">
+              <span class="cal-num">${day}</span>
+              ${!future && totalHabits > 0 ? `<span class="cal-dot-row">${
+                allDone ? '✓' : someDone ? `${doneCount}/${totalHabits}` : ''
+              }</span>` : ''}
+            </div>`
+        }).join('')}
+      </div>
+
+      <div class="cal-legend">
+        <div class="leg-item"><div class="leg-dot done"></div><span>Tudo feito</span></div>
+        <div class="leg-item"><div class="leg-dot partial"></div><span>Parcial</span></div>
+        <div class="leg-item"><div class="leg-dot empty"></div><span>Nenhum</span></div>
       </div>
     </div>`
 }
 
+// ── Settings ──────────────────────────────────────────────────
 function renderSettings() {
   return `
     <div class="settings-wrap">
@@ -369,6 +409,7 @@ function renderSettings() {
     </div>`
 }
 
+// ── Events ────────────────────────────────────────────────────
 function attachEvents() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => { currentView = btn.dataset.view; render() })
