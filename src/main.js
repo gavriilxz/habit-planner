@@ -1,6 +1,39 @@
 import { supabase } from './supabase.js'
 import './style.css'
 
+
+const GABRIEL_PHOTO = 'data:image/jpeg;base64,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'
+
+function checkBeta() {
+  return !localStorage.getItem('beta_accepted')
+}
+
+function acceptBeta() {
+  localStorage.setItem('beta_accepted', '1')
+  render()
+}
+
+function renderBeta() {
+  return `
+    <div class="beta-wrap">
+      <div class="beta-card">
+        <div class="beta-badge">🚧 VERSÃO BETA</div>
+        <div class="beta-photo-wrap">
+          <img src="${GABRIEL_PHOTO}" class="beta-photo" alt="Gabriel Sales" />
+        </div>
+        <h2 class="beta-dev">Desenvolvido por<br><strong>Gabriel Sales</strong></h2>
+        <p class="beta-text">
+          Este aplicativo está em fase de testes ativos.<br>
+          Alguns recursos podem estar incompletos ou mudar sem aviso prévio.
+        </p>
+        <p class="beta-ask">
+          Ao continuar, você concorda em reportar bugs e feedbacks que ajudem a melhorar o app. 🙏
+        </p>
+        <button class="beta-btn" id="beta-continue">Entendi, continuar</button>
+      </div>
+    </div>`
+}
+
 let currentUser = null
 let habits = []
 let checkins = {}
@@ -113,6 +146,12 @@ function calcStreak() {
 // ── Render ────────────────────────────────────────────────────
 function render() {
   const app = document.getElementById('app')
+
+  if (checkBeta()) {
+    app.innerHTML = renderBeta()
+    document.getElementById('beta-continue').addEventListener('click', acceptBeta)
+    return
+  }
 
   if (loading) {
     app.innerHTML = `<div class="splash"><div class="splash-logo">✦</div><p>Carregando...</p></div>`

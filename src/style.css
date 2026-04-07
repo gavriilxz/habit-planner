@@ -471,3 +471,54 @@ input { font-family: var(--font); }
 .login-footer {
   margin-top: 24px; font-size: 12px; color: var(--text-muted);
 }
+
+/* ── Beta screen ── */
+.beta-wrap {
+  min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+  padding: 32px 24px; background: var(--bg);
+  position: relative; overflow: hidden;
+}
+.beta-wrap::before {
+  content: ''; position: absolute;
+  width: 350px; height: 350px;
+  background: radial-gradient(circle, rgba(233,30,140,0.12) 0%, transparent 70%);
+  top: 30%; left: 50%; transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.beta-card {
+  width: 100%; max-width: 340px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 16px; text-align: center;
+  animation: fadeUp 0.5s ease both;
+}
+.beta-badge {
+  background: rgba(233,30,140,0.15); color: var(--pink);
+  border: 1px solid rgba(233,30,140,0.3);
+  border-radius: 99px; padding: 6px 16px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+}
+.beta-photo-wrap {
+  width: 90px; height: 90px; border-radius: 50%;
+  border: 2px solid var(--pink);
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(233,30,140,0.3);
+}
+.beta-photo { width: 100%; height: 100%; object-fit: cover; }
+.beta-dev {
+  font-size: 16px; font-weight: 400; color: var(--text-muted); line-height: 1.5;
+}
+.beta-dev strong { color: var(--text); font-weight: 600; }
+.beta-text {
+  font-size: 13px; color: var(--text-muted); line-height: 1.7;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px;
+}
+.beta-ask {
+  font-size: 12px; color: var(--text-muted); line-height: 1.6;
+}
+.beta-btn {
+  width: 100%; background: var(--pink); color: white;
+  font-size: 15px; font-weight: 600; border-radius: 12px; padding: 15px;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.beta-btn:active { transform: scale(0.98); opacity: 0.9; }
