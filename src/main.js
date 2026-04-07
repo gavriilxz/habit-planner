@@ -173,7 +173,9 @@ function renderAuth() {
   return `
     <div class="login-wrap">
       <div class="login-card">
-        <div class="login-logo">✦</div>
+        <div class="login-logo">
+          <img src="/icon-192.png" alt="Fiel" />
+        </div>
         <h1 class="login-title">Fiel</h1>
         <p class="login-sub">Seu planner de hábitos diários</p>
         <div class="auth-tabs">
@@ -186,6 +188,7 @@ function renderAuth() {
           <button class="login-btn" id="auth-submit">${isLogin?'Entrar':'Criar conta'}</button>
         </div>
         <div id="auth-msg" class="login-msg"></div>
+        <p class="login-footer">Seus dados são privados e seguros ✦</p>
       </div>
     </div>`
 }
