@@ -1,7 +1,6 @@
 import { supabase } from './supabase.js'
 import './style.css'
 
-// ── Estado global ─────────────────────────────────────────────
 let currentUser = null
 let habits = []
 let checkins = {}
@@ -16,22 +15,32 @@ function fmtDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-const MONTHS = [
-  'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
-]
+const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 const MONTH_DAYS = [31,28,29,31,30,31,30,31,31,30,31,30,31]
 
 // ── Auth ──────────────────────────────────────────────────────
 async function init() {
   render()
+
+  // Trata redirect do magic link (funciona no Safari)
+  const { data: { session: sessionFromUrl } } = await supabase.auth.getSessionFromUrl({ storeSession: true }).catch(() => ({ data: { session: null } }))
+
   const { data: { session } } = await supabase.auth.getSession()
-  currentUser = session?.user ?? null
+  currentUser = sessionFromUrl?.user ?? session?.user ?? null
+
+  // Limpa o hash da URL sem recarregar
+  if (window.location.hash.includes('access_token')) {
+    history.replaceState(null, '', window.location.pathname)
+  }
 
   supabase.auth.onAuthStateChange((_event, session) => {
+    const wasLoggedIn = !!currentUser
     currentUser = session?.user ?? null
-    if (currentUser) loadAll()
-    else { habits = []; checkins = {}; loading = false; render() }
+    if (currentUser) {
+      loadAll()
+    } else if (wasLoggedIn) {
+      habits = []; checkins = {}; loading = false; render()
+    }
   })
 
   if (currentUser) await loadAll()
@@ -43,16 +52,14 @@ async function init() {
 async function sendMagicLink(email) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.origin }
+    options: { emailRedirectTo: 'https://habit-planner-dusky.vercel.app' }
   })
   return error
 }
 
 async function signOut() {
   await supabase.auth.signOut()
-  habits = []; checkins = {}
-  currentView = 'today'
-  render()
+  habits = []; checkins = {}; currentView = 'today'; render()
 }
 
 // ── Data ──────────────────────────────────────────────────────
@@ -154,7 +161,6 @@ function fmtDateLabel(d) {
   return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`
 }
 
-// ── Login ─────────────────────────────────────────────────────
 function renderLogin() {
   return `
     <div class="login-wrap">
@@ -168,8 +174,7 @@ function renderLogin() {
         </div>
         <div id="login-msg" class="login-msg"></div>
       </div>
-    </div>
-  `
+    </div>`
 }
 
 function attachLoginEvents() {
@@ -189,7 +194,7 @@ function attachLoginEvents() {
       btn.textContent = 'Entrar'
       btn.disabled = false
     } else {
-      msg.innerHTML = `✅ Link enviado para <strong>${email}</strong>!<br>Verifique sua caixa de entrada.`
+      msg.innerHTML = `✅ Link enviado para <strong>${email}</strong>!<br>Abra o e-mail e clique no link — ele vai te trazer direto pro app.`
       msg.className = 'login-msg success'
       document.getElementById('login-form').style.display = 'none'
     }
@@ -197,37 +202,6 @@ function attachLoginEvents() {
 
   btn.addEventListener('click', doLogin)
   input.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin() })
-}
-
-// ── Today ─────────────────────────────────────────────────────
-function renderToday() {
-  if (!habits.length) return `
-    <div class="empty-state">
-      <div class="empty-icon">🌱</div>
-      <p>Nenhum hábito ainda.</p>
-      <p class="empty-sub">Vá em <strong>Hábitos</strong> para adicionar.</p>
-    </div>`
-
-  const done = habits.filter(h => {
-    const v = getCheckin(h.id, todayStr)
-    return h.is_water ? v >= 6 : v >= 1
-  }).length
-  const pct = Math.round((done / habits.length) * 100)
-
-  return `
-    <div class="today-wrap">
-      <div class="progress-card">
-        <div class="progress-header">
-          <span class="progress-label">Progresso de hoje</span>
-          <span class="progress-pct">${pct}%</span>
-        </div>
-        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-        <div class="progress-sub">${done} de ${habits.length} hábitos completos</div>
-      </div>
-      <div class="habits-list">
-        ${habits.map(h => renderHabitRow(h, todayStr)).join('')}
-      </div>
-    </div>`
 }
 
 function habitIcon(name) {
@@ -279,7 +253,36 @@ function renderHabitRow(habit, date) {
     </div>`
 }
 
-// ── Month ─────────────────────────────────────────────────────
+function renderToday() {
+  if (!habits.length) return `
+    <div class="empty-state">
+      <div class="empty-icon">🌱</div>
+      <p>Nenhum hábito ainda.</p>
+      <p class="empty-sub">Vá em <strong>Hábitos</strong> para adicionar.</p>
+    </div>`
+
+  const done = habits.filter(h => {
+    const v = getCheckin(h.id, todayStr)
+    return h.is_water ? v >= 6 : v >= 1
+  }).length
+  const pct = Math.round((done/habits.length)*100)
+
+  return `
+    <div class="today-wrap">
+      <div class="progress-card">
+        <div class="progress-header">
+          <span class="progress-label">Progresso de hoje</span>
+          <span class="progress-pct">${pct}%</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="progress-sub">${done} de ${habits.length} hábitos completos</div>
+      </div>
+      <div class="habits-list">
+        ${habits.map(h => renderHabitRow(h, todayStr)).join('')}
+      </div>
+    </div>`
+}
+
 function renderMonth() {
   const year = 2026
   const daysInMonth = MONTH_DAYS[currentMonth]
@@ -318,7 +321,6 @@ function renderMonth() {
     </div>`
 }
 
-// ── Settings ──────────────────────────────────────────────────
 function renderSettings() {
   return `
     <div class="settings-wrap">
@@ -349,12 +351,10 @@ function renderSettings() {
     </div>`
 }
 
-// ── Events ────────────────────────────────────────────────────
 function attachEvents() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', () => { currentView = btn.dataset.view; render() })
   })
-
   document.getElementById('signout')?.addEventListener('click', signOut)
   document.getElementById('signout-full')?.addEventListener('click', signOut)
 
@@ -375,12 +375,8 @@ function attachEvents() {
     })
   })
 
-  document.getElementById('prev-month')?.addEventListener('click', () => {
-    currentMonth = Math.max(0, currentMonth-1); render()
-  })
-  document.getElementById('next-month')?.addEventListener('click', () => {
-    currentMonth = Math.min(11, currentMonth+1); render()
-  })
+  document.getElementById('prev-month')?.addEventListener('click', () => { currentMonth = Math.max(0, currentMonth-1); render() })
+  document.getElementById('next-month')?.addEventListener('click', () => { currentMonth = Math.min(11, currentMonth+1); render() })
 
   document.querySelectorAll('[data-delete-id]').forEach(btn => {
     btn.addEventListener('click', async () => {

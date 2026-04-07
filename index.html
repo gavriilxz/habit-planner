@@ -15,6 +15,16 @@
 </head>
 <body>
   <div id="app"></div>
+  <!-- Intercepta o hash do magic link ANTES do JS carregar -->
+  <script>
+    // O Supabase manda o token no hash (#access_token=...) ou como query (?code=...)
+    // Detecta e salva no sessionStorage pra o app processar
+    const hash = window.location.hash
+    const search = window.location.search
+    if (hash.includes('access_token') || search.includes('code=')) {
+      sessionStorage.setItem('auth_redirect', window.location.href)
+    }
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
