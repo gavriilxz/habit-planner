@@ -23,6 +23,15 @@ const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','A
 const MONTH_DAYS = [31,28,29,31,30,31,30,31,31,30,31,30,31]
 const WEEK_DAYS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
 
+
+// ── Cache local ───────────────────────────────────────────────
+function saveCache(key, data) {
+  try { localStorage.setItem('constante_' + key, JSON.stringify(data)) } catch(e) {}
+}
+function loadCache(key) {
+  try { const d = localStorage.getItem('constante_' + key); return d ? JSON.parse(d) : null } catch(e) { return null }
+}
+
 // ── Auth ──────────────────────────────────────────────────────
 async function init() {
   render()
@@ -56,7 +65,18 @@ async function signOut() {
 
 // ── Data ──────────────────────────────────────────────────────
 async function loadAll() {
-  loading = true; render()
+  // Carrega cache instantaneamente
+  const cachedHabits = loadCache(currentUser.id + '_habits')
+  const cachedCheckins = loadCache(currentUser.id + '_checkins')
+  if (cachedHabits) {
+    habits = cachedHabits
+    checkins = cachedCheckins || {}
+    loading = false
+    render()
+  } else {
+    loading = true; render()
+  }
+  // Atualiza em background
   await Promise.all([loadHabits(), loadCheckins()])
   loading = false; render()
 }
@@ -65,6 +85,7 @@ async function loadHabits() {
   const { data } = await supabase.from('habits')
     .select('*').eq('user_id', currentUser.id).order('position')
   habits = data || []
+  saveCache(currentUser.id + '_habits', habits)
 }
 
 async function loadCheckins() {
@@ -72,6 +93,7 @@ async function loadCheckins() {
     .select('*').eq('user_id', currentUser.id)
   checkins = {}
   ;(data||[]).forEach(c => { checkins[`${c.habit_id}|${c.date}`] = c.value })
+  saveCache(currentUser.id + '_checkins', checkins)
 }
 
 function getCheckin(hid, date) { return checkins[`${hid}|${date}`] ?? 0 }
