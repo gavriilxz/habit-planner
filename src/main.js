@@ -169,7 +169,7 @@ function render() {
       <header class="topbar">
         <div class="topbar-left">
           <span class="logo">✦</span>
-          <span class="app-title">Fiel</span>
+          <span class="app-title">Constante</span>
         </div>
         <div class="topbar-right">
           <span class="topbar-date">${fmtDateLabel(today)}</span>
@@ -213,9 +213,9 @@ function renderAuth() {
     <div class="login-wrap">
       <div class="login-card">
         <div class="login-logo">
-          <img src="/icon-192.png" alt="Fiel" />
+          <img src="/icon-192.png" alt="Constante" />
         </div>
-        <h1 class="login-title">Fiel</h1>
+        <h1 class="login-title">Constante</h1>
         <p class="login-sub">Seu planner de hábitos diários</p>
         <div class="auth-tabs">
           <button class="auth-tab ${isLogin?'active':''}" data-mode="login">Entrar</button>
